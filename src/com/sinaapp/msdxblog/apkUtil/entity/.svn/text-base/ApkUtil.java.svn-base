@@ -1,0 +1,117 @@
+/*
+ * @(#)ApkUtil.java		       version: 0.1 
+ * Date:2012-1-9
+ *
+ * Copyright (c) 2011 CFuture09, Institute of Software, 
+ * Guangdong Ocean University, Zhanjiang, GuangDong, China.
+ * All rights reserved.
+ */
+package com.sinaapp.msdxblog.apkUtil.utils;
+
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.zip.ZipFile;
+
+import org.jdom.Document;
+import org.jdom.Element;
+import org.jdom.JDOMException;
+import org.jdom.Namespace;
+import org.jdom.input.SAXBuilder;
+
+import com.sinaapp.msdxblog.apkUtil.entity.ApkInfo;
+
+/**
+ * @author CFuture.Geek_Soledad(66704238@51uc.com)
+ */
+public class ApkUtil {
+	public static final String NAME_SPACE = "android";
+	public static final String VERSION_NAME = "versionName";
+	public static final String VERSION_CODE = "versionCode";
+	public static final String APK_PACAKGE = "package";
+	public static final String MIN_SDK_VERSION = "minSdkVersion";
+	public static final String ELEM_USES_PERMISSION = "uses-permission";
+	public static final String ELEM_USES_SDK = "uses-sdk";
+	public static final Namespace ANDROID_NAMESPACE = Namespace
+			.getNamespace("http://schemas.android.com/apk/res/android");
+
+	/**
+	 * 返回一个apk程序的信息。
+	 * 
+	 * @param apkPath
+	 *            apk的路径。
+	 * @return
+	 */
+	public static ApkInfo getApkInfo(String apkPath) {
+		InputStream xmlIs = null;
+		ZipFile zipFile = null;
+		InputStream stream = null;
+		try {
+			zipFile = new ZipFile(apkPath);
+			stream = FileUtil.getManifestInputStream(zipFile);
+			xmlIs = FileUtil.xmlPrint(stream);
+		} catch (IOException e) {
+			e.printStackTrace();
+		} finally {
+			try {
+				stream.close();
+				zipFile.close();
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+		}
+
+		return manifestSax(xmlIs);
+	}
+
+	/**
+	 * 解析AndroidManifest文件，获取apk信息。
+	 * 
+	 * @param manifestStream
+	 *            AndroidManifest文件的输入流。
+	 * @return
+	 */
+	public static ApkInfo manifestSax(InputStream manifestStream) {
+		ApkInfo apk = new ApkInfo();
+		SAXBuilder builder = new SAXBuilder();
+		try {
+			Document document = builder.build(manifestStream);
+			Element root = document.getRootElement();
+			
+			// 从根节点获取apk版本信息。
+			apk.setVersionCode(root.getAttributeValue(VERSION_CODE, ANDROID_NAMESPACE));
+			apk.setVersionName(root.getAttributeValue(VERSION_NAME, ANDROID_NAMESPACE));
+			apk.setApkPackage(root.getAttributeValue(APK_PACAKGE));
+			
+			// 获取使用的SDK平台的最低版本号。
+			Element elemUseSdk = root.getChild(ELEM_USES_SDK);
+			apk.setMinSdkVersion(elemUseSdk.getAttributeValue(MIN_SDK_VERSION, ANDROID_NAMESPACE));
+			
+			// 获得使用的权限。
+			List<Element> listPermission = root.getChildren(ELEM_USES_PERMISSION);
+			List<String> permissions = new ArrayList<String>();
+			for (Element element : listPermission) {
+				permissions.add(element.getAttributeValue("name", ANDROID_NAMESPACE));
+			}
+			apk.setUses_permission(permissions);
+			System.out.println(apk);
+		} catch (JDOMException e) {
+			e.printStackTrace();
+		} catch (IOException e) {
+			e.printStackTrace();
+		} finally {
+			try {
+				manifestStream.close();
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+		}
+		return apk;
+	}
+
+	public static void main(String[] args) {
+		getApkInfo("E:/share/res/apk/UniversityTimetable.apk");
+	}
+
+}
